@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nour's Valentines</title>
+    <style>
+        body {
+            margin: 0; overflow: hidden;
+            background: radial-gradient(circle at center, #111 0%, #000 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+        
+        #canvas-container { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #hand-canvas { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; z-index: 5; pointer-events: none; }
+        video { display: none; }
+        
+        /* NEW: Cute Message Window in top right */
+        #message-box {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            width: 240px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            color: #fff;
+            z-index: 100;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            transform: translateX(50px);
+            pointer-events: none;
+            text-align: center;
+        }
+        #message-box.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        #message-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            font-weight: 300;
+            letter-spacing: 0.5px;
+            font-style: italic;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 101; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: #fff; transition: opacity 0.8s; text-align: center; padding: 0 20px;
+        }
+        #start-btn {
+            padding: 15px 40px; font-size: 1.2rem; background: linear-gradient(45deg, #ff007f, #a200ff);
+            border: none; border-radius: 30px; color: white; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 2px;
+            box-shadow: 0 0 30px rgba(255, 0, 127, 0.4); margin-top: 20px; transition: 0.3s;
+        }
+        #start-btn:hover { transform: scale(1.05); box-shadow: 0 0 50px rgba(162, 0, 255, 0.6); }
+
+        #glass-menu {
+            position: absolute; top: 50%; left: 30px; transform: translateY(-50%);
+            background: rgba(20, 20, 20, 0.4); border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(15px);
+            padding: 20px; display: flex; flex-direction: column; gap: 15px;
+            z-index: 10; opacity: 0; transition: opacity 1s; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .menu-title { color: rgba(255,255,255,0.5); font-size: 0.75rem; letter-spacing: 2px; text-transform: uppercase; text-align: center; margin-bottom: 5px;}
+        .glass-btn {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 12px 20px; border-radius: 10px; cursor: pointer;
+            font-size: 0.9rem; letter-spacing: 1px; transition: all 0.3s ease; text-align: left;
+        }
+        .glass-btn:hover { background: rgba(255,255,255,0.15); transform: translateX(5px); border-color: rgba(255,0,127,0.5);}
+
+        #ui {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            background: rgba(10, 10, 10, 0.6); padding: 15px 30px; border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
+            display: flex; gap: 20px; z-index: 10; color: rgba(255,255,255,0.4);
+            pointer-events: none; opacity: 0; transition: opacity 1s;
+        }
+        .hud-item { font-size: 0.75rem; text-transform: uppercase; display: flex; align-items: center; gap: 6px; font-weight: 600; letter-spacing: 1px; transition: color 0.3s, text-shadow 0.3s;}
+        .active-gesture { color: #ff007f !important; text-shadow: 0 0 15px rgba(255, 0, 127, 0.8) !important; }
+
+        #shape-indicator {
+            position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
+            color: white; z-index: 10; font-size: 1.2rem; letter-spacing: 4px; text-transform: uppercase;
+            opacity: 0; transition: opacity 0.5s; text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="message-box">
+        <div id="message-text">You own my heart</div>
+    </div>
+
+    <div id="shape-indicator">HEART</div>
+
+    <div id="overlay">
+        <h1 style="font-weight: 300; letter-spacing: 5px; margin-bottom: 10px; line-height: 1.4;">WILL YOU BE MY VALENTINES?</h1>
+        <div style="font-size: 0.9rem; opacity: 0.7;">pls</div>
+        <button id="start-btn">Yes</button>
+    </div>
+
+    <div id="canvas-container"></div>
+    <canvas id="hand-canvas"></canvas>
+    
+    <video id="input_video" autoplay muted playsinline></video>
+    
+    <div id="glass-menu">
+        <div class="menu-title">Manual Override</div>
+        <button class="glass-btn" onclick="triggerMorph('heart')">Heart</button>
+        <button class="glass-btn" onclick="triggerMorph('saturn')">Saturn</button>
+        <button class="glass-btn" onclick="triggerMorph('rose')">Spiral</button>
+        <button class="glass-btn" onclick="triggerMorph('fireworks')">Fireworks</button>
+        <button class="glass-btn" onclick="triggerMorph('sphere')">Sphere</button>
+    </div>
+
+    <div id="ui">
+        <div id="ind-swipe" class="hud-item">Left Hand: Rotate</div>
+        <div id="ind-fist" class="hud-item">Fist Morph</div>
+        <div id="ind-zoom" class="hud-item">2 Hands Zoom</div>
+        <div id="ind-blink" class="hud-item">Right fist Blink </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/AfterimageShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/AfterimagePass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+<script>
+const CONFIG = {
+    particleCount: 25000, 
+    camZ: 350,
+    sensitivity: { rotate: 1.75 }, 
+    physics: { friction: 0.90 },  
+    shapes: ['heart', 'saturn', 'rose', 'fireworks', 'sphere']
+};
+
+// Map shapes to your custom quotes
+const ROMANCE_QUOTES = {
+    heart: "You own my heart",
+    saturn: "All these stars and i get lost in your eyes only",
+    rose: "Every thought leads back to you",
+    fireworks: "I love you beyond comprehension",
+    sphere: "With u everything feels complete"
+};
+
+const STATE = {
+    lastHandPos: new THREE.Vector2(0, 0), velocity: new THREE.Vector2(0, 0),
+    manualRotX: 0, manualRotY: 0, currentScale: 1.0, lastPinchDist: null,
+    autoRotY: 0, autoRotSpeed: 0.001, leftFist: false
+};
+
+let camera, scene, renderer, particleSystem, composer, starField, afterimagePass;
+let uniforms;
+const shapeBuffers = {};
+let currentShapeIdx = 0;
+let isMorphing = false;
+let morphTimer = 0;
+
+const handCanvas = document.getElementById('hand-canvas');
+const handCtx = handCanvas.getContext('2d');
+handCanvas.width = window.innerWidth;
+handCanvas.height = window.innerHeight;
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('overlay').style.opacity = '0';
+    setTimeout(() => { document.getElementById('overlay').style.display = 'none'; }, 800);
+    document.getElementById('ui').style.opacity = '1';
+    document.getElementById('glass-menu').style.opacity = '1';
+    
+    // Show heart message on start
+    const msgBox = document.getElementById('message-box');
+    msgBox.classList.add('visible');
+
+    init();
+    startCamera();
+});
+
+const vertexShader = `
+    uniform float time;
+    uniform float mixVal;
+    uniform float scale;
+    uniform float crumbleAmt;
+    uniform vec3 colorShift;
+    uniform float beatIntensity; 
+    
+    attribute vec3 positionB;
+    attribute float size;
+    attribute vec3 color; 
+    
+    varying vec3 vColor;
+    varying float vAlpha;
+    
+    float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 4325.5453); }
+
+    void main() {
+        vec3 pos = mix(position, positionB, mixVal);
+        float pump = sin(time * 3.0); 
+        float pulse = 1.0 + (pump * 0.06 * beatIntensity);
+        pos *= pulse;
+
+        vec3 noiseVec = vec3(hash(pos), hash(pos.zyx), hash(pos.yxz)) * 2.0 - 1.0;
+        
+        pos += noiseVec * crumbleAmt * 120.0;
+        
+        vec3 finalPos = pos * scale;
+        vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        
+        float dynamicSize = size + (crumbleAmt * 4.0);
+        gl_PointSize = dynamicSize * (400.0 / -mvPosition.z) * scale;
+        
+        vec3 shiftedColor = color + colorShift;
+        vColor = mod(shiftedColor, 1.0); 
+        vAlpha = smoothstep(800.0, 50.0, -mvPosition.z); 
+    }
+`;
+
+const fragmentShader = `
+    varying vec3 vColor;
+    varying float vAlpha;
+    void main() {
+        vec2 coord = gl_PointCoord - vec2(0.5);
+        if(length(coord) > 0.5) discard;
+        float strength = 1.0 - (length(coord) * 2.0);
+        strength = pow(strength, 2.5); 
+        gl_FragColor = vec4(vColor, strength * vAlpha * 0.9); 
+    }
+`;
+
+const Generators = {
+    heart: (i) => {
+        while(true) {
+            let x = (Math.random() - 0.5) * 3.0, y = (Math.random() - 0.5) * 3.0, z = (Math.random() - 0.5) * 3.0;
+            let x2 = x*x, y2 = y*y, z2 = z*z;
+            let a = x2 + 2.25*z2 + y2 - 1.0;
+            let val = a*a*a - x2*(y*y2) - 0.1125*z2*(y*y2);
+            if (val <= 0.0 && val > -0.2) return new THREE.Vector3(x * 85, y * 85, z * 85); 
+        }
+    },
+    saturn: (i) => {
+        if(Math.random() > 0.3) {
+            let u = Math.random(), v = Math.random(), r = 55 * Math.cbrt(Math.random());
+            let theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
+            return new THREE.Vector3(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+        } else {
+            let angle = Math.random() * Math.PI * 2, radius = 90 + Math.random() * 60;
+            return new THREE.Vector3(Math.cos(angle) * radius, (Math.random()-0.5) * 2, Math.sin(angle) * radius);
+        }
+    },
+    rose: (i) => {
+        let r = Math.random() * 90, theta = r * 0.5, y = (Math.random() - 0.5) * r * 0.5; 
+        let x = r * Math.cos(theta), z = r * Math.sin(theta);
+        y += Math.pow(r / 90, 2) * 30; 
+        return new THREE.Vector3(x, y - 15, z);
+    },
+    fireworks: (i) => {
+        let u = Math.random(), v = Math.random(), r = Math.random() > 0.8 ? Math.random() * 110 : 110; 
+        let theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
+        return new THREE.Vector3(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+    },
+    sphere: (i) => {
+        let u = Math.random(), v = Math.random(), r = 85 * Math.cbrt(Math.random());
+        let theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
+        return new THREE.Vector3(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+    }
+};
+
+function init() {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000000, 0.0015);
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.z = CONFIG.camZ;
+
+    renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    const renderScene = new THREE.RenderPass(scene, camera);
+    afterimagePass = new THREE.AfterimagePass();
+    afterimagePass.uniforms["damp"].value = 0.65; 
+    
+    const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 1.5, 0.4, 0.85);
+    bloomPass.threshold = 0; bloomPass.strength = 1.0; bloomPass.radius = 0.3;
+
+    composer = new THREE.EffectComposer(renderer);
+    composer.addPass(renderScene); 
+    composer.addPass(afterimagePass);
+    composer.addPass(bloomPass);
+
+    initParticles(); createBackgroundStars(); animate();
+}
+
+function initParticles() {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(CONFIG.particleCount * 3);
+    const positionsB = new Float32Array(CONFIG.particleCount * 3);
+    const sizes = new Float32Array(CONFIG.particleCount);
+    const colors = new Float32Array(CONFIG.particleCount * 3);
+    
+    const colorInside = new THREE.Color(0xff0055); 
+    const colorOutside = new THREE.Color(0xff99bb); 
+
+    CONFIG.shapes.forEach(shape => {
+        const arr = new Float32Array(CONFIG.particleCount * 3);
+        for(let i=0; i<CONFIG.particleCount; i++) {
+            const vec = Generators[shape](i);
+            arr[i*3] = vec.x; arr[i*3+1] = vec.y; arr[i*3+2] = vec.z;
+        }
+        shapeBuffers[shape] = arr;
+    });
+
+    const initShape = shapeBuffers['heart'];
+    for(let i=0; i<CONFIG.particleCount; i++) {
+        positions[i*3] = initShape[i*3]; positions[i*3+1] = initShape[i*3+1]; positions[i*3+2] = initShape[i*3+2];
+        sizes[i] = Math.random() * 3.5 + 2.0;
+        const dist = Math.sqrt(initShape[i*3]**2 + initShape[i*3+1]**2 + initShape[i*3+2]**2) / 85;
+        const mixedColor = colorInside.clone().lerp(colorOutside, dist);
+        colors[i*3] = mixedColor.r; colors[i*3+1] = mixedColor.g; colors[i*3+2] = mixedColor.b;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('positionB', new THREE.BufferAttribute(positionsB, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    uniforms = {
+        time: { value: 0.0 }, mixVal: { value: 0.0 }, scale: { value: 1.0 }, crumbleAmt: { value: 0.0 },
+        beatIntensity: { value: 1.0 }, colorShift: { value: new THREE.Vector3(0, 0, 0) }
+    };
+
+    const mat = new THREE.ShaderMaterial({
+        uniforms: uniforms, vertexShader: vertexShader, fragmentShader: fragmentShader,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+
+    particleSystem = new THREE.Points(geometry, mat); scene.add(particleSystem);
+}
+
+function createBackgroundStars() {
+    const geo = new THREE.BufferGeometry(); const pos = [];
+    for(let i=0; i<3000; i++) {
+        const r = 300 + Math.random() * 700, theta = Math.random() * Math.PI * 2, phi = Math.acos(2 * Math.random() - 1);
+        pos.push(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const starMat = new THREE.PointsMaterial({color: 0xffffff, size: 1.5, transparent: true, opacity: 0.5, fog: false});
+    starField = new THREE.Points(geo, starMat); scene.add(starField);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    const timeSec = performance.now() * 0.001;
+    uniforms.time.value = timeSec;
+
+    if (Math.abs(STATE.velocity.x) > 0.001 || Math.abs(STATE.velocity.y) > 0.001) {
+        STATE.autoRotSpeed = 0; 
+    } else {
+        STATE.autoRotSpeed = THREE.MathUtils.lerp(STATE.autoRotSpeed, 0.001, 0.02);
+    }
+    
+    STATE.autoRotY += STATE.autoRotSpeed;
+    STATE.manualRotY += STATE.velocity.x; 
+    STATE.manualRotX += STATE.velocity.y; 
+    STATE.velocity.x *= CONFIG.physics.friction; 
+    STATE.velocity.y *= CONFIG.physics.friction;
+    
+    particleSystem.rotation.y = STATE.autoRotY + STATE.manualRotY; 
+    particleSystem.rotation.x = STATE.manualRotX; 
+    if(starField) starField.rotation.y = STATE.autoRotY * 0.5; 
+
+    composer.render();
+}
+
+function showShapeName(name) {
+    const el = document.getElementById('shape-indicator');
+    const msgBox = document.getElementById('message-box');
+    const msgText = document.getElementById('message-text');
+
+    // Update main indicator
+    el.innerText = name.toUpperCase(); 
+    el.style.opacity = '1';
+    
+    // Update and animate the Cute Window
+    msgText.innerText = ROMANCE_QUOTES[name] || "";
+    msgBox.classList.add('visible');
+
+    setTimeout(() => { 
+        el.style.opacity = '0'; 
+    }, 2000);
+}
+
+window.triggerColorChange = function() {
+    gsap.to(uniforms.colorShift.value, {
+        x: Math.random(),
+        y: Math.random(),
+        z: Math.random(),
+        duration: 0.6
+    });
+    showShapeName("COLOR SHIFT");
+}
+
+window.triggerMorph = function(name) {
+    const geom = particleSystem.geometry;
+    if(uniforms.mixVal.value > 0.5) {
+        geom.setAttribute('position', geom.attributes.positionB.clone());
+        uniforms.mixVal.value = 0.0;
+    }
+    geom.attributes.positionB.set(shapeBuffers[name]);
+    geom.attributes.positionB.needsUpdate = true;
+
+    gsap.killTweensOf(uniforms.beatIntensity);
+    gsap.to(uniforms.beatIntensity, { value: name === 'heart' ? 1.0 : 0.0, duration: 1.0 });
+
+    gsap.killTweensOf(uniforms.mixVal);
+    gsap.to(uniforms.mixVal, { value: 1.0, duration: 1.5, ease: "power2.inOut" });
+    
+    showShapeName(name);
+}
+
+function isFist(lm) { return lm[8].y > lm[5].y && lm[12].y > lm[9].y && lm[16].y > lm[13].y && lm[20].y > lm[17].y; }
+
+function drawHandWireframe(landmarks, isLeft) {
+    const w = handCanvas.width;
+    const h = handCanvas.height;
+    handCtx.strokeStyle = isLeft ? "rgba(255, 0, 127, 0.4)" : "rgba(0, 255, 136, 0.4)";
+    handCtx.lineWidth = 2;
+    handCtx.fillStyle = isLeft ? "rgba(255, 0, 127, 0.8)" : "rgba(0, 255, 136, 0.8)";
+    const connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
+    handCtx.beginPath();
+    connections.forEach(conn => {
+        const p1 = landmarks[conn[0]]; const p2 = landmarks[conn[1]];
+        handCtx.moveTo(p1.x * w, p1.y * h); handCtx.lineTo(p2.x * w, p2.y * h);
+    });
+    handCtx.stroke();
+    landmarks.forEach(point => {
+        handCtx.beginPath(); handCtx.arc(point.x * w, point.y * h, 3, 0, 2 * Math.PI); handCtx.fill();
+    });
+}
+
+function startCamera() {
+    const videoElement = document.getElementById('input_video');
+    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5, selfieMode: true });
+    
+    const uiFist = document.getElementById('ind-fist');
+    const uiZoom = document.getElementById('ind-zoom');
+    const uiSwipe = document.getElementById('ind-swipe');
+    const uiBlink = document.getElementById('ind-blink');
+
+    hands.onResults((results) => {
+        handCtx.clearRect(0, 0, handCanvas.width, handCanvas.height);
+        uiFist.classList.remove('active-gesture');
+        uiZoom.classList.remove('active-gesture');
+        uiSwipe.classList.remove('active-gesture');
+        uiBlink.classList.remove('active-gesture');
+
+        if(!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+            STATE.lastHandPos.set(0, 0); 
+            if (isMorphing) {
+                isMorphing = false; morphTimer = 0;
+                gsap.to(uniforms.crumbleAmt, { value: 0.0, duration: 1.0 });
+            }
+            return;
+        }
+
+        const count = results.multiHandLandmarks.length;
+
+        if(count === 2) {
+            uiZoom.classList.add('active-gesture'); 
+            const h1 = results.multiHandLandmarks[0][9], h2 = results.multiHandLandmarks[1][9];
+            const currentDist = Math.hypot(h1.x-h2.x, h1.y-h2.y);
+            if(STATE.lastPinchDist !== null) {
+                const deltaDist = currentDist - STATE.lastPinchDist;
+                STATE.currentScale += deltaDist * 5.0; 
+                STATE.currentScale = THREE.MathUtils.clamp(STATE.currentScale, 0.4, 3.5);
+                gsap.to(uniforms.scale, {value: STATE.currentScale, duration: 0.1});
+            }
+            STATE.lastPinchDist = currentDist;
+        } else {
+            STATE.lastPinchDist = null; 
+        }
+
+        let rotating = false;
+        let morphFist = false;
+
+        for (let i = 0; i < count; i++) {
+            const lm = results.multiHandLandmarks[i];
+            const isLeftHand = results.multiHandedness[i].label === 'Right';
+            const fist = isFist(lm);
+            drawHandWireframe(lm, isLeftHand);
+
+            if (isLeftHand) {
+                if (fist && !STATE.leftFist) { STATE.leftFist = true; uiBlink.classList.add('active-gesture'); }
+                else if (!fist && STATE.leftFist) { 
+                    STATE.leftFist = false; uiBlink.classList.add('active-gesture'); triggerColorChange(); 
+                }
+            } else {
+                if (fist) {
+                    morphFist = true; uiFist.classList.add('active-gesture'); 
+                    if (!isMorphing) {
+                        isMorphing = true;
+                        gsap.to(uniforms.crumbleAmt, { value: 1.0, duration: 0.8 }); 
+                    }
+                    morphTimer += 1;
+                    if (morphTimer > 20) { 
+                        morphTimer = 0;
+                        currentShapeIdx = (currentShapeIdx + 1) % CONFIG.shapes.length;
+                        triggerMorph(CONFIG.shapes[currentShapeIdx]);
+                    }
+                    STATE.lastHandPos.set(0, 0); 
+                } else {
+                    rotating = true; uiSwipe.classList.add('active-gesture'); 
+                    if (isMorphing) {
+                        isMorphing = false; morphTimer = 0;
+                        gsap.to(uniforms.crumbleAmt, { value: 0.0, duration: 1.5, ease: "elastic.out(1, 0.5)" });
+                    }
+                    if (STATE.lastHandPos.x !== 0) {
+                        const deltaX = (lm[8].x - STATE.lastHandPos.x); 
+                        const deltaY = (lm[8].y - STATE.lastHandPos.y); 
+                        STATE.velocity.x = deltaX * CONFIG.sensitivity.rotate;
+                        STATE.velocity.y = deltaY * CONFIG.sensitivity.rotate;
+                    }
+                    STATE.lastHandPos.set(lm[8].x, lm[8].y);
+                }
+            }
+        }
+        if (!morphFist && isMorphing) {
+            isMorphing = false; morphTimer = 0;
+            gsap.to(uniforms.crumbleAmt, { value: 0.0, duration: 1.5, ease: "elastic.out(1, 0.5)" });
+        }
+        if (!rotating) STATE.lastHandPos.set(0, 0);
+    });
+
+    const webCamera = new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 640, height: 480 });
+    webCamera.start();
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+    handCanvas.width = window.innerWidth;
+    handCanvas.height = window.innerHeight;
+});
+</script>
+</body>
+</html>
